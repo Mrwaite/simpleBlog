@@ -18,10 +18,20 @@ var crypto = require("crypto"),
 
 module.exports = function(app){
   app.get('/',function(req,res){
-    res.render('index', {title : '主页'});
+    res.render('index', {
+        title : '主页',
+        user : req.session.user,
+        success : req.flash('success').toString(),
+        error : req.flash('error').toString()
+    });
   });
     app.get('/reg',function(req,res){
-       res.render('reg',{title: '注册'});
+       res.render('reg',{
+           title: '注册',
+           user : req.session.user,
+           success : req.flash('success').toString(),
+           error : req.flash('error').toString()
+       });
     });
     app.post('/reg',function(req,res){
         //通过body-parser middleware 来读取传过来的json数据
