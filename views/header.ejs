@@ -10,20 +10,19 @@
     <h1><%= title %></h1>
 </header>
 <nav>
-    <span><a href="/" title="主页">home</a></span>
+    <span><a title="主页" href="/">home</a></span>
     <% if (user) { %>
-        <span><a href="/post" title="发表">post</a></span>
-        <span><a href="/logout" title="登出">logout</a></span>
-    <% } %>
-    <% else{ %>
-        <span><a href="/login" title="登陆">login</a></span>
-        <span><a href="/reg" title="注册">refister</a></span>
+    <span><a title="发表" href="/post">post</a></span>
+    <span><a title="登出" href="/logout">logout</a></span>
+    <% } else { %>
+    <span><a title="登录" href="/login">login</a></span>
+    <span><a title="注册" href="/reg">register</a></span>
     <% } %>
 </nav>
 <article>
-    <% if(success){ %>
-        <div><%= success %></div>
+    <% if (success) { %>
+    <div><%= success %></div>
     <% } %>
-    <% if(error) {%>
-        <div><%= error %></div>
+    <% if (error) { %>
+    <div><%= error %> </div>
     <% } %>
