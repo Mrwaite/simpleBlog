@@ -1,5 +1,6 @@
 var express = require('express');
 var router = express.Router();
+var multer = require("multer");
 
 /* GET home page. */
 
@@ -15,15 +16,29 @@ var router = express.Router();
 //导入crypto模块，user.js用户模型文件，crypto用来生成散列值来加密密码
 var crypto = require("crypto"),
     User = require("../models/user.js"),
-    Post = require("../models/post.js");
+    Post = require("../models/post.js"),
+    Comment = require('../models/comment.js');
 
+var storage = multer.diskStorage({
+    //destination是上传文件所在的目录
+    destination : function(req, file, cb){
+        cb(null, './public/images');
+    },
+    //filename修改上传文件重命名，originalname
+    filename : function(req, file, cb){
+        cb(null, file.originalname);
+    }
+});
 
+var upload = multer({
+    storage : storage
+});
 
 module.exports = function(app){
     //检查是都为登陆状态的函数
 
     app.get('/', function (req, res) {
-        Post.get(null, function(err, posts){
+        Post.getAll(null, function(err, posts){
             if(err){
                 post = [];
             }
@@ -149,13 +164,139 @@ module.exports = function(app){
         res.redirect('/');//登出之后跳转到主界面
     });
 
+    app.get('/uplaod',checkLogin);
+    app.get('/upload', function(req, res){
+        res.render('upload', {
+            title : '文件上传',
+            user : req.session.user,
+            success : req.flash('success').toString(),
+            error : req.flash('error').toString()
+        });
+    });
+
+    app.post('/upload', checkLogin);
+    app.post('/upload', upload.array('field1', 5), function(req, res){
+            req.flash('success', '文件上传成功');
+            res.redirect('/upload');
+    });
+    //用户界面路由
+    app.get('/u/:name', function(req, res){
+        //检查用户是否存在
+        User.get(req.params.name, function(err, user){
+            if(!user) {
+                req.flash('error', '用户不存在');
+                return res.redirect('/');
+            }
+            //查询返回该用户的所有文章
+            Post.getAll(user.name, function(err, posts){
+                if(err){
+                    req.flash('error', err);
+                    return res.redirect('/');
+                }
+                res.render('user', {
+                    title : user.name,//这个点击的楼主的name
+                    posts : posts,//点击的人的所有文章
+                    user : req.session.name,//这个是当前登陆的用户的name
+                    success : req.flash('success').toString(),
+                    error : req.flash('error').toString()
+                });
+            });
+        });
+    });
+    //文章界面路由
+    app.get('/u/:name/:day/:title', function(req, res){
+        Post.getOne(req.params.name, req.params.day, req.params.title, function(err ,doc){
+            if(err){
+                req.flash('error', err);
+                return res.redirect('/');
+            }
+            res.render('article', {
+                title : req.params.title,
+                post : doc,
+                user : req.session.user,
+                success : req.flash('success').toString(),
+                error : req.flash('error').toString()
+            });
+        });
+    });
+
+    //添加文章留言的路由
+    app.post('/u/:name/:day/:title', function (req, res) {
+       var  date = new Date(),
+           time = date.getFullYear() + "-" + (date.getMonth() + 1) + "-" + date.getDate() + " " + date.getHours() + ":" + (date.getMinutes() < 10 ? '0' + date.getMinutes() : date.getMinutes());
+        var comment = {
+            name : req.body.name,
+            email : req.body.email,
+            website : req.body.website,
+            time : time,
+            content : req.body.content
+        };
+        //这里传入作者的name，day，title，当前留言comment
+         var newComment = new Comment(req.params.name, req.params.day, req.params.title, comment);
+        newComment.save(function(err){
+            if(err) {
+                req.flash('err', err);
+                return res.redirect('back');
+            }
+            req.flash('success', '留言成功');
+            res.redirect('back');
+        });
+    });
+
+    //编辑文章路由
+    app.get('/edit/:name/:day/:title', function(req, res){
+        var currentUser = req.session.user;
+        //这里使用currentUser.name不用req.params.name,防止不是作者本人的修改，这样的话不是本人的修改，就查不到这篇文章
+        Post.edit(currentUser.name, req.params.day, req.params.title, function(err, doc){
+            if(err){
+                req.flash('error', err);
+                return res.redirect('back');
+            }
+            res.render('edit', {
+                title : "编辑",
+                post : doc,
+                user : req.session.user,
+                success : req.flash('success').toString(),
+                error : req.flash('error').toString()
+            });
+        });
+    });
+
+    app.post('/edit/:name/:day/:title', checkLogin);
+    app.post('/edit/:name/:day/:title', function (req, res) {
+        var currentUser = req.session.user;
+        Post.update(currentUser.name, req.params.day, req.params.title, req.body.post, function (err) {
+            var url = encodeURI('/u/' + req.params.name + '/' + req.params.day + '/' + req.params.title);
+            if(err){
+                req.flash('error', err);
+                return res.redirect(url);//失败返回回 文章页面
+            }
+            req.flash('success', '修改成功');
+            res.redirect(url);//成功返回到文章页面
+        });
+    });
+
+
+    //删除一片一篇文章的路由
+    app.get('/remove/:name/:day/:ttile', checkLogin);
+    app.get('/remove/:name/:day/:title', function (req, res) {
+        var currentUser = req.session.user;
+        Post.remove(currentUser.name, req.params.day, req.params.title, function (err) {
+            if(err){
+                req.flash('error', err);
+                return res.redirect('back');
+            }
+            req.flash('success', '删除成功');
+            res.redirect('/');
+        })
+    })
     function checkLogin (req, res, next){
         if (!req.session.user) {
             req.flash('error', '未登录');
             res.redirect('/login');
         }
         next();
-    
+
     }
     //检查是否为未登录转台的函数
     function checkNotLogin(req, res, next){
