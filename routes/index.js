@@ -38,7 +38,10 @@ module.exports = function(app){
     //检查是都为登陆状态的函数
 
     app.get('/', function (req, res) {
-        Post.getAll(null, function(err, posts){
+        //判断是否是第一条，并把请求的页数转化成number类型、
+        var page = parseInt(req.query.p) || 1;
+        //查询返回第page页的10篇文章
+        Post.getTen(null, page, function(err, posts, total){
             if(err){
                 post = [];
             }
@@ -46,6 +49,9 @@ module.exports = function(app){
                 title: '主页',
                 user: req.session.user,
                 posts: posts,
+                page : page,
+                isFirstPage: (page - 1) == 0,
+                isLastPage: ((page - 1)*10 + posts.length) == total,
                 success: req.flash('success').toString(),
                 error: req.flash('error').toString()
             });
@@ -147,7 +153,8 @@ module.exports = function(app){
     app.post('/post', checkLogin);
     app.post('/post',function(req,res){
         var currentUser = req.session.user,
-            post = new Post(currentUser.name, req.body.title, req.body.post);
+            tags = [req.body.tag1, req.body.tag2, req.body.tag3];
+            post = new Post(currentUser.name, req.body.title, tags, req.body.post);
         post.save(function(err){
             if(err){
                 req.flash('error', err);
@@ -181,6 +188,7 @@ module.exports = function(app){
     });
     //用户界面路由
     app.get('/u/:name', function(req, res){
+        var page = parseInt(req.query.p) || 1;
         //检查用户是否存在
         User.get(req.params.name, function(err, user){
             if(!user) {
@@ -188,7 +196,7 @@ module.exports = function(app){
                 return res.redirect('/');
             }
             //查询返回该用户的所有文章
-            Post.getAll(user.name, function(err, posts){
+            Post.getTen(user.name, page, function(err, posts, total){
                 if(err){
                     req.flash('error', err);
                     return res.redirect('/');
@@ -196,6 +204,9 @@ module.exports = function(app){
                 res.render('user', {
                     title : user.name,//这个点击的楼主的name
                     posts : posts,//点击的人的所有文章
+                    page: page,
+                    isFirstPage : (page - 1) == 0,
+                    isLastPage : ((page - 1)*10 + posts.length) == total,
                     user : req.session.name,//这个是当前登陆的用户的name
                     success : req.flash('success').toString(),
                     error : req.flash('error').toString()
@@ -203,6 +214,25 @@ module.exports = function(app){
             });
         });
     });
+
+    //归档界面
+    app.get('/archive', function(req, res){
+        Post.getArchive(function(err, posts){
+            if(err){
+                req.flash('error', err);
+                res.redirect('/');
+            }
+            res.render("archive",{
+                title : '存档',
+                posts : posts,
+                user : req.session.user,
+                success : req.flash('success').toString(),
+                error : req.flash('error').toString()
+            });
+        });
+    });
+
+
     //文章界面路由
     app.get('/u/:name/:day/:title', function(req, res){
         Post.getOne(req.params.name, req.params.day, req.params.title, function(err ,doc){

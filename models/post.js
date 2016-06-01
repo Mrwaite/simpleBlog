@@ -2,10 +2,11 @@
 var mongodb = require('./db'),
     markdown = require("markdown").markdown;//markdown模块
 
-function Post(name, title, post){
+function Post(name, title, tags, post){
     this.name = name;
     this.title = title;
     this.post = post;
+    this.tags = tags;
 }
 
 module.exports = Post;
@@ -29,7 +30,8 @@ Post.prototype.save = function(callback){
         time : time,
         title : this.title,
         post : this.post,
-        comments : []
+        comments : [],
+        tags : this.tags
     };
     //打开数据库
     mongodb.open(function(err, db){
@@ -56,7 +58,7 @@ Post.prototype.save = function(callback){
 
 
 //获取name 的所有文章，或者获取全部人的文章，参数为null
-Post.getAll = function(name, callback){
+Post.getTen = function(name, page, callback){
     //打开数据库
     mongodb.open(function(err, db){
         if(err){
@@ -73,7 +75,7 @@ Post.getAll = function(name, callback){
                 query.name = name;
             }
             //根据query对面查询文章
-            collection.find(query).sort({time : -1}).toArray(function(err, docs){
+            /*collection.find(query).sort({time : -1}).toArray(function(err, docs){
                 mongodb.close();
                 if(err){
                     return callback(err);
@@ -83,6 +85,26 @@ Post.getAll = function(name, callback){
                     doc.post = markdown.toHTML(doc.post);
                 });
                 callback(null, docs);//成功！以数组形式返回查询结果
+            });*/
+            //count返回查询到的文章的数量total
+            collection.count(query, function(err, total){
+               //根据query对象查询， 并跳过前面（page-1）*10 个结果，返回之后的10个结果
+                collection.find(query, {
+                    skip : (page - 1)*10,
+                    limit : 10
+                }).sort({
+                    time : -1
+                }).toArray(function(err, docs){
+                    mongodb.close();
+                    if(err){
+                        return callback(err);
+                    }
+                    //解析markdown为html文档
+                    docs.forEach(function(doc){
+                        doc.post = markdown.toHTML(doc.post);
+                    });
+                    callback(null, docs, total);
+                });
             });
         });
     });
@@ -209,6 +231,36 @@ Post.remove = function (name, day, title, callback){
                 }
                 callback(null);
             };
+        });
+    });
+};
+
+Post.getArchive = function(callback){
+    //打开数据库
+    mongodb.open(function(err, db){
+        if(err){
+            return callback(err);
+        }
+        //读取post集合
+        db.collection("posts", function(err, collection){
+            if(err){
+                mongodb.close();
+                return callback(err);
+            }
+            //返回只有name，time，title组成的集合
+            collection.find({}, {
+                "name" : 1,
+                "time" : 1,
+                "title" : 1
+            }).sort({
+                time: -1
+            }).toArray(function(err, docs){
+                mongodb.close();
+                if(err){
+                    return callback(err);
+                }
+                callback(null, docs);
+            });
         });
     });
 };
