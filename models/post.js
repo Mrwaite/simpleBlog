@@ -2,11 +2,12 @@
 var mongodb = require('./db'),
     markdown = require("markdown").markdown;//markdown模块
 
-function Post(name, title, tags, post){
+function Post(name, head, title, tags, post){
     this.name = name;
     this.title = title;
     this.post = post;
     this.tags = tags;
+    this.head = head;
 }
 
 module.exports = Post;
@@ -31,7 +32,9 @@ Post.prototype.save = function(callback){
         title : this.title,
         post : this.post,
         comments : [],
-        tags : this.tags
+        tags : this.tags,
+        pv : 0,
+        head : this.head
     };
     //打开数据库
     mongodb.open(function(err, db){
@@ -129,19 +132,34 @@ Post.getOne = function(name, day, title, callback){
                 "time.day" : day,//这个是查询time对面下面的day
                 "title" : title
             }, function(err, doc){
-                mongodb.close();
+
                 if(err){
+                    mongodb.close();
                     return callback(err);
                 }
                 //解析markdown为html
                 //让留言也支持markdown语法
                 if(doc){
+                    //每访问一次， pv值就加一
+                    collection.update({
+                        "name" : name ,
+                        "time.day" : day,
+                        "title" : title
+                    }, {
+                        $inc : {"pv" : 1}
+                    }, function (err) {
+                        mongodb.close();
+                        if(err) {
+                            return callback(err);
+                        }
+                    });
                     doc.post = markdown.toHTML(doc.post);
-                    /*doc.comments.forEach(function(comment){
+                    doc.comments.forEach(function(comment){
                         comment.content = markdown.toHTML(comment.content);
-                    });*/
+                    });
+                    callback(null, doc);
                 }
-                callback(null, doc);
+
             });
         });
     });
@@ -265,3 +283,89 @@ Post.getArchive = function(callback){
     });
 };
 
+
+Post.getTags = function (callback) {
+    mongodb.open(function (err, db) {
+        if(err) {
+            return callback(err);
+        }
+        //得到posts集合
+        db.collection('posts', function (err, collecion) {
+            if(err) {
+                mongodb.close();
+                return callback(err);
+            }
+            //用distinct来找出指定键的所有的值
+            collecion.distinct('tags', function (err, docs) {
+                mongodb.close();
+                if(err) {
+                    return callback(err);
+                }
+                callback(null, docs);
+            });
+        });
+    });
+};
+
+//返回有特定标签的所有文章
+Post.getTag = function (tag, callback) {
+    mongodb.open(function (err, db) {
+        if(err) {
+            return callback(err);
+        }
+        db.collection('posts', function (err, collection) {
+            if(err) {
+                mongodb.close();
+                return callback(err);
+            }
+            collection.find({
+                "tags" : tag
+            }, {
+                "name" : 1,
+                "time" : 1,
+                "title" : 1
+            }).sort({
+                time : -1
+            }).toArray(function (err, docs) {
+                mongodb.close();
+                if(err) {
+                    return callback(err);
+                }
+                callback(null, docs);
+            });
+        });
+    });
+};
+
+
+//返回通过标题关键字查询多有文章的信息
+
+Post.search = function (keyword, callback) {
+    mongodb.open(function (err, db) {
+        if(err) {
+            return callback(err);
+        }
+        db.collection('posts', function (err, collection) {
+            if(err) {
+                mongodb.close();
+                return callback(err);
+            }
+            var pattern = new RegExp(keyword, "i");
+            collection.find({
+                "title" : pattern
+            }, {
+                "name" : 1,
+                "time" : 1,
+                "title" : 1
+            }).sort({
+                time : -1
+            }).toArray(function(err, docs){
+                mongodb.close();
+                if(err) {
+                    return callback(err);
+                }
+                callback(null, docs);
+            });
+        });
+    });
+}
