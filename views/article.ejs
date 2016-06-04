@@ -1,11 +1,33 @@
 <%- include header %>
+<!--以上代码的意思是：我们设置一个 flag 标志，如果用户是游客，或者是该文章的目前作者，或者是该文章的上一级作者，或者已经转载过该文章，都会将 flag 设置为 0 ，即不显示 转载 链接-->
 <p>
     <% if(user.name == post.name ){ %>
     <span><a href="/edit/<%= post.name %>/<%= post.time.day %>/<%= post.title %>" class="edit">编辑</a></span>
     <span><a href="/remove/<%= post.name %>/<%= post.time.day %>/<%= post.title %>" class="edit">删除</a></span>
     <% } %>
+    <% var flag = 1 %>
+    <% if (user && (user.name != post.name)) { %>
+        <% if ((post.reprint_info.reprint_from != undefined) && (user.name == post.reprint_info.reprint_from.name)) { %>
+            <% flag = 0 %>
+        <% } %>
+        <% if ((post.reprint_info.reprint_to != undefined)) { %>
+            <% post.reprint_info.reprint_to.forEach(function (reprint_to, index) { %>
+                <% if (user.name == reprint_to.name) { %>
+                    <% flag = 0 %>
+                 <% } %>
+            <% }) %>
+        <% } %>
+    <% } else { %>
+    <% flag = 0 %>
+    <% } %>
+    <% if (flag) { %>
+    <span><a class="edit" href="/reprint/<%= post.name %>/<%= post.time.day %>/<%= post.title %>">转载</a></span>
+    <% } %>
 </p>
 <p class="info">
+    <% if (post.reprint_info.reprint_from) { %>
+    <br><a href="/u/<%= post.reprint_info.reprint_from.name %>/<%= post.reprint_info.reprint_from.day %>/<%= post.reprint_info.reprint_from.title %>">原文链接</a>
+    <% } %>
     作者：<a href="/u/<%= post.name %>"><%= post.name %></a> |
     日期：<%= post.time.minute %>
     标签：
@@ -16,6 +38,15 @@
     <% }) %>
 </p>
 <p><%- post.post %></p>
-<p class="info">阅读：<%= post.pv %> | 评论：<%= post.comments.length %></p>
+<p class="info">
+    阅读：<%= post.pv %> |
+    评论：<%= post.comments.length %> |
+    转载：
+    <% if (post.reprint_info.reprint_to) { %>
+    <%= post.reprint_info.reprint_to.length %>
+    <% } else { %>
+    <%= 0 %>
+    <% } %>
+</p>
 <%- include comment %>
 <%- include footer %>
