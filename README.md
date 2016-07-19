@@ -23,3 +23,25 @@
 ###  模板引擎：ejs
 ###  中间件： express-session，connect-mongo，connect-flash ，markdown， multer
 ###  模型： user模型，post模型， comment模型
+
+### 如何操作
+
+**设置blog为工作目录并启动数据库** ： 
+`cd bin`
+`./mongod  --dbpath ../blog/`
+
+**启动当前项目**
+`cd  ~/nodejsWorkSpace/nodejs/simpleBlog`
+`node app.js`
+
+**工具supervisor使用方法**
+`cd  ~/nodejsWorkSpace/nodejs/simpleBlog`
+`supervisor app.js`
+
+**是用node调试工具node-inspector**
+
+`node --debug app.js`
+`node-inspector &`
+
+
+
